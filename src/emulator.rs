@@ -26,13 +26,28 @@ pub enum MouseButton {
 /// User events a chess board can respond to.
 #[derive(Clone, Copy)]
 pub enum Event {
-    ButtonDown { x: f32, y: f32, button: MouseButton },
-    ButtonUp { x: f32, y: f32, button: MouseButton },
-    MouseMotion { x: f32, y: f32 },
+    ButtonDown {
+        x: f32,
+        y: f32,
+        button: MouseButton,
+    },
+    ButtonUp {
+        x: f32,
+        y: f32,
+        button: MouseButton,
+    },
+    MouseMotion {
+        x: f32,
+        y: f32,
+    },
     FirstTurn,
     PrevTurn,
     NextTurn,
     LastTurn,
+    /// We've been told to rotate idx to r.
+    RotateUnchecked(usize, f32),
+    /// We've been told to move idx to x, y.
+    MoveUnchecked(usize, f32, f32),
 }
 
 #[derive(PartialEq, Debug)]
@@ -60,6 +75,8 @@ pub struct RotchessEmulator {
     /// points that that piece has access to.
     selected_piece: Option<usize>,
     /// (idx of travelpoint within buffer, angle offset of drag, whether we have dragged yet)
+    ///
+    /// Set when we mbd to hold a travel point, updated when we drag it around.
     selected_travelpoint: Option<(usize, f32, bool)>,
 
     turns: Turns,
@@ -94,6 +111,17 @@ fn calc_angle_offset(pivot: (f32, f32), from: (f32, f32), to: (f32, f32)) -> f32
     let to_angle = f32::atan2(to.1, to.0);
 
     to_angle - from_angle
+}
+
+pub enum ThingHappened {
+    FirstTurn,
+    PrevTurn,
+    NextTurn,
+    LastTurn,
+    /// We rotated the piece at usize to r
+    Rotate(usize, f32),
+    /// We moved the piece at usize to x, y
+    Move(usize, f32, f32),
 }
 
 /// Helpful functions for the update portion of a game loop implementing rotchess.
@@ -160,7 +188,7 @@ impl RotchessEmulator {
     /// 1. captures
     /// 1. piece selection
     /// 1. moves
-    pub fn handle_event(&mut self, e: Event) {
+    pub fn handle_event(&mut self, e: Event) -> Option<ThingHappened> {
         match e {
             Event::MouseMotion { x, y } => {
                 // println!("dragged: {} {}", x, y);
@@ -183,6 +211,7 @@ impl RotchessEmulator {
 
                     self.selected_travelpoint = Some((tvp_idx, angle_offset, true));
                 }
+                None
             }
             Event::ButtonDown {
                 x,
@@ -209,18 +238,19 @@ impl RotchessEmulator {
                             self.selected_piece = Some(new_i);
                             self.update_travelpoints_unchecked();
                         }
-                        return;
+                        return None;
                     }
                     (Some(new_i), None) => {
                         // we clicked on a piece, and None pieces were selected.
                         self.selected_piece = Some(new_i);
                         self.update_travelpoints_unchecked();
-                        return;
+                        return None;
                     }
                     (None, _) => {
                         self.selected_piece = None;
                     }
                 }
+                None
             }
             Event::ButtonDown {
                 x,
@@ -257,12 +287,12 @@ impl RotchessEmulator {
                                 false,
                             ));
                             if tp.travelable {
-                                return;
+                                return None;
                             }
                         }
                     }
                     if self.selected_travelpoint.is_some() {
-                        return;
+                        return None;
                     }
                 }
 
@@ -278,13 +308,13 @@ impl RotchessEmulator {
                             self.selected_piece = Some(new_i);
                             self.update_travelpoints_unchecked();
                         }
-                        return;
+                        return None;
                     }
                     (Some(new_i), None) => {
                         // we clicked on a piece, and None pieces were selected.
                         self.selected_piece = Some(new_i);
                         self.update_travelpoints_unchecked();
-                        return;
+                        return None;
                     }
                     (None, _) => {
                         if self.selected_travelpoint.is_none() {
@@ -292,6 +322,7 @@ impl RotchessEmulator {
                         }
                     }
                 }
+                None
             }
             Event::ButtonUp {
                 x,
@@ -304,53 +335,97 @@ impl RotchessEmulator {
                     // if we selected a travelpoint and it hasn't been moved yet, we want to try
                     // to initiate the travel.
                     let tp = &self.travelpoints_buffer[trav_idx];
-                    debug_assert!(Piece::collidepoint_generic(x, y, tp.x, tp.y));
+                    let (tp_x, tp_y) = (tp.x, tp.y);
+                    debug_assert!(Piece::collidepoint_generic(x, y, tp_x, tp_y));
 
                     if tp.travelable {
                         // if it is indeed travelable, travel.
                         let pieces = &mut self.turns.working_board_mut();
-                        let new_piece_idx = pieces.travel(
-                            self.selected_piece
-                                .expect("Invariant of selected_travelpoint.issome"),
-                            tp.x,
-                            tp.y,
-                        );
+                        let piece_idx = self // the idx of the piece that moves
+                            .selected_piece
+                            .expect("Invariant of selected_travelpoint.issome");
+                        let new_piece_idx = pieces.travel(piece_idx, tp_x, tp_y);
                         self.selected_piece = Some(new_piece_idx);
                         self.update_travelpoints_unchecked();
                         self.selected_piece = None;
                         self.selected_travelpoint = None;
                         self.turns.save_turn();
-                        return;
+                        return Some(ThingHappened::Move(piece_idx, tp_x, tp_y));
                     }
                     self.selected_travelpoint = None;
                 }
 
-                if let Some((_, _, true)) = self.selected_travelpoint {
+                if let Some((piece_idx, _, true)) = self.selected_travelpoint {
                     self.selected_travelpoint = None;
                     self.turns.save_turn();
+
+                    let r = self.pieces()[piece_idx].angle();
+                    return Some(ThingHappened::Rotate(piece_idx, r));
                 }
+
+                None
             }
             Event::FirstTurn => {
                 self.turns.first();
                 self.selected_piece = None;
                 self.selected_travelpoint = None;
+                Some(ThingHappened::FirstTurn)
             }
             Event::PrevTurn => {
                 _ = self.turns.prev();
                 self.selected_piece = None;
                 self.selected_travelpoint = None;
+                Some(ThingHappened::PrevTurn)
             }
             Event::NextTurn => {
                 _ = self.turns.next();
                 self.selected_piece = None;
                 self.selected_travelpoint = None;
+                Some(ThingHappened::NextTurn)
             }
             Event::LastTurn => {
                 self.turns.last();
                 self.selected_piece = None;
                 self.selected_travelpoint = None;
+                Some(ThingHappened::LastTurn)
             }
-            _ => {}
+            Event::RotateUnchecked(piece_idx, r) => {
+                // to elaborate, it would suck to be playing around and then a piece
+                // rotates for "no reason"
+                assert!(
+                    self.selected_travelpoint.is_none() && self.selected_piece.is_none(),
+                    "It would probably be a good idea for this check
+                     to never fail, but who knows. Go find the dev if
+                     you see this error message."
+                );
+
+                self.turns
+                    .working_board_mut()
+                    .get_mut(piece_idx)
+                    .expect("Invariant of unchecked")
+                    .set_angle(r);
+                self.turns.save_turn();
+                None
+            }
+            Event::MoveUnchecked(piece_idx, x, y) => {
+                // to elaborate, it would suck to be playing around and then a piece
+                // move for "no reason"
+                assert!(
+                    self.selected_travelpoint.is_none() && self.selected_piece.is_none(),
+                    "It would probably be a good idea for this check
+                     to never fail, but who knows. Go find the dev if
+                     you see this error message."
+                );
+
+                let pieces = &mut self.turns.working_board_mut();
+                let new_piece_idx = pieces.travel(piece_idx, x, y);
+                self.selected_piece = Some(new_piece_idx);
+                self.update_travelpoints_unchecked();
+                self.selected_piece = None;
+                self.turns.save_turn();
+                None
+            }
+            _ => None,
         }
     }
 }
