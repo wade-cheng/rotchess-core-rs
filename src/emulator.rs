@@ -355,9 +355,13 @@ impl RotchessEmulator {
                     self.selected_travelpoint = None;
                 }
 
-                if let Some((piece_idx, _, true)) = self.selected_travelpoint {
+                if let Some((_, _, true)) = self.selected_travelpoint {
                     self.selected_travelpoint = None;
                     self.turns.save_turn();
+
+                    let piece_idx = self
+                        .selected_piece
+                        .expect("Invariant of sel travelpt.is_some");
 
                     let r = self.pieces()[piece_idx].angle();
                     return Some(ThingHappened::Rotate(piece_idx, r));
