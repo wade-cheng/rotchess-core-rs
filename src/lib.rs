@@ -20,6 +20,7 @@
 //! - rotchess-unit: an eighth of the side length of the board.
 
 pub mod emulator;
+mod engine;
 pub mod floating_drift;
 pub mod piece;
 pub mod turn;
