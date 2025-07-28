@@ -725,6 +725,10 @@ impl Pieces {
         &self.inner
     }
 
+    pub fn inner_mut(&mut self) -> &mut Vec<Piece> {
+        &mut self.inner
+    }
+
     /// Move the piece at idx to x, y.
     ///
     /// # Warnings

@@ -204,12 +204,14 @@ impl Turns {
     /// Return all possible moves that the current player can make.
     ///
     /// Current player defined by `self.to_move`.
-    fn all_moves(&self) -> Vec<EngineMove> {
+    fn all_moves(&mut self) -> Vec<EngineMove> {
         let mut ans = vec![];
-        for (i, piece) in self.working_board.inner_ref().iter().enumerate() {
+        for (i, piece) in self.working_board.inner_mut().iter_mut().enumerate() {
             if piece.side() != self.to_move {
                 continue;
             }
+
+            piece.init_auxiliary_data();
 
             for (x, y) in piece
                 .move_points_unchecked()
