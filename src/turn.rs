@@ -1,18 +1,29 @@
-use crate::piece::Pieces;
+use crate::piece::{Pieces, Side};
 
 pub struct Turns {
     working_board: Pieces,
     curr_turn: usize,
     turns: Vec<Pieces>,
+    /// Whose turn it is.
+    ///
+    /// Update this manually, which is odd. Recall we have the playground style
+    /// of board where turn order may not matter.
+    to_move: Side,
 }
 
+/// Generic turn methods.
 impl Turns {
     pub fn with(pieces: Pieces) -> Self {
         Self {
             working_board: pieces.clone(),
             curr_turn: 0,
             turns: vec![pieces],
+            to_move: Side::White,
         }
+    }
+
+    pub fn set_to_move(&mut self, side: Side) {
+        self.to_move = side;
     }
 
     pub fn curr_turn(&self) -> usize {
@@ -78,5 +89,138 @@ impl Turns {
     fn load_turn(&mut self, turn: usize) {
         self.working_board.clone_from(&self.turns[turn]);
         self.curr_turn = turn;
+    }
+}
+
+/// A move as represented by our engine.
+struct EngineMove {
+    travel: (usize, f32, f32),
+    rotate: (usize, f32),
+}
+
+/// Score for how good a position is.
+type Score = f32;
+/// depth of negamax search in plies
+const DEPTH: usize = 4;
+
+/// Engine code.
+impl Turns {
+    /// Returns the score, statically evaluated at the current position.
+    ///
+    /// A float with more positive favoring the current player from `self.to_move`, 0 even.
+    fn eval(&self) -> Score {
+        let mult = match self.to_move {
+            Side::Black => -1.,
+            Side::White => 1.,
+        };
+        let mut ans = 0.0;
+        for piece in self.working_board.inner_ref() {
+            ans += mult
+                * match piece.side() {
+                    Side::Black => -1.,
+                    Side::White => 1.,
+                }
+        }
+        ans
+    }
+
+    /// Return the score we get in `depth` plies when minimizing our maximum loss.
+    ///
+    /// "We" should be `self.to_move`.
+    fn negamax(&mut self, depth: usize) -> Score {
+        if depth == 0 {
+            return self.eval();
+        }
+
+        let mut best_score = Score::NEG_INFINITY;
+
+        for move_ in self.all_moves() {
+            self.apply(&move_);
+            best_score = Score::max(best_score, -self.negamax(depth - 1));
+            self.prev().expect("There will be a prev move.");
+        }
+
+        best_score
+    }
+
+    /// Make the best move for the current player from `self.to_move`.
+    pub fn make_best_move(&mut self) {
+        let mut best_score: Score = Score::NEG_INFINITY;
+        let mut best_move: Option<EngineMove> = None;
+
+        let moves = self.all_moves();
+        assert!(!moves.is_empty());
+        for move_ in moves {
+            self.apply(&move_);
+            let score = -self.negamax(DEPTH);
+            self.prev().expect("There will be a prev move.");
+
+            if score >= best_score {
+                best_score = score;
+                best_move = Some(move_);
+            }
+        }
+
+        self.apply(&best_move.expect("should've found a valid move."));
+    }
+
+    /// Applies a move to the current board and saves the turn.
+    ///
+    /// Since we save, this will remove future turns that were saved!
+    fn apply(&mut self, move_: &EngineMove) {
+        debug_assert!(
+            self.working_board
+                .get_mut(move_.travel.0)
+                .expect("EngineMove supplied wasn't valid")
+                .side()
+                == self.to_move
+        );
+        debug_assert!(
+            self.working_board
+                .get_mut(move_.rotate.0)
+                .expect("EngineMove supplied wasn't valid")
+                .side()
+                == self.to_move
+        );
+
+        let (i, x, y) = move_.travel;
+
+        self.working_board.travel(i, x, y);
+        self.working_board
+            .get_mut(i)
+            .expect("EngineMove supplied wasn't valid")
+            .update_capmove_points_unchecked();
+
+        let (i, r) = move_.rotate;
+        self.working_board
+            .get_mut(i)
+            .expect("EngineMove supplied wasn't valid")
+            .set_angle(r);
+
+        self.save_turn();
+        self.to_move = self.to_move.toggle();
+    }
+
+    /// Return all possible moves that the current player can make.
+    ///
+    /// Current player defined by `self.to_move`.
+    fn all_moves(&self) -> Vec<EngineMove> {
+        let mut ans = vec![];
+        for (i, piece) in self.working_board.inner_ref().iter().enumerate() {
+            if piece.side() != self.to_move {
+                continue;
+            }
+
+            for (x, y) in piece
+                .move_points_unchecked()
+                .chain(piece.capture_points_unchecked())
+            {
+                ans.push(EngineMove {
+                    travel: (i, *x, *y),
+                    rotate: (i, piece.angle()),
+                })
+            }
+        }
+        ans
     }
 }

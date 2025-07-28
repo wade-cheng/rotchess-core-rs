@@ -350,6 +350,7 @@ impl RotchessEmulator {
                         self.selected_piece = None;
                         self.selected_travelpoint = None;
                         self.turns.save_turn();
+                        self.turns.set_to_move(self.pieces()[piece_idx].side());
                         return Some(ThingHappened::Move(piece_idx, tp_x, tp_y));
                     }
                     self.selected_travelpoint = None;
@@ -363,6 +364,7 @@ impl RotchessEmulator {
                         .selected_piece
                         .expect("Invariant of sel travelpt.is_some");
 
+                    self.turns.set_to_move(self.pieces()[piece_idx].side());
                     let r = self.pieces()[piece_idx].angle();
                     return Some(ThingHappened::Rotate(piece_idx, r));
                 }

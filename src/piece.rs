@@ -139,6 +139,13 @@ impl Side {
             Side::White => "W",
         }
     }
+
+    pub fn toggle(&self) -> Self {
+        match self {
+            Side::Black => Side::White,
+            Side::White => Side::Black,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -437,8 +444,13 @@ impl Piece {
         self.core.center.1
     }
 
-    pub fn set_y(&mut self, x: f32) {
-        self.core.center.1 = x;
+    pub fn set_y(&mut self, y: f32) {
+        self.core.center.1 = y;
+    }
+
+    pub fn set_pos(&mut self, x: f32, y: f32) {
+        self.core.center.0 = x;
+        self.core.center.1 = y;
     }
 
     pub fn angle(&self) -> f32 {
@@ -529,6 +541,11 @@ impl Piece {
             &self.core,
             self.secondary.as_ref().expect("We just created this."),
         )));
+    }
+
+    pub fn update_capmove_points_unchecked(&mut self) {
+        self.update_capture_points_unchecked();
+        self.update_move_points_unchecked();
     }
 
     /// Update self's capture points with the drawable DistancesAngles.
