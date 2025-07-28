@@ -1,6 +1,6 @@
 use std::{collections::HashSet, f32::consts::PI, hash::Hash};
 
-use crate::emulator::TravelKind;
+use crate::{emulator::TravelKind, turn::Score};
 
 /// An iterable over the distances of a [`DistancesAngle`].
 ///
@@ -169,9 +169,18 @@ impl PieceKind {
             PieceKind::King => "king",
         }
     }
-}
 
-impl PieceKind {
+    pub fn value(&self) -> Score {
+        match self {
+            PieceKind::Pawn => 1.0,
+            PieceKind::Rook => 5.0,
+            PieceKind::Knight => 3.0,
+            PieceKind::Bishop => 3.0,
+            PieceKind::Queen => 9.0,
+            PieceKind::King => 1000.0,
+        }
+    }
+
     pub fn can_jump(&self) -> bool {
         match self {
             PieceKind::Pawn => true,

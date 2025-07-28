@@ -1,4 +1,7 @@
-use crate::piece::{Pieces, Side};
+use crate::{
+    emulator::TravelKind,
+    piece::{Pieces, Side},
+};
 
 pub struct Turns {
     working_board: Pieces,
@@ -99,9 +102,9 @@ struct EngineMove {
 }
 
 /// Score for how good a position is.
-type Score = f32;
+pub type Score = f32;
 /// depth of negamax search in plies
-const DEPTH: usize = 4;
+const DEPTH: usize = 3;
 
 /// Engine code.
 impl Turns {
@@ -115,11 +118,11 @@ impl Turns {
         };
         let mut ans = 0.0;
         for piece in self.working_board.inner_ref() {
-            ans += mult
-                * match piece.side() {
+            ans +=
+                mult * match piece.side() {
                     Side::Black => -1.,
                     Side::White => 1.,
-                }
+                } * piece.kind().value();
         }
         ans
     }
@@ -128,6 +131,7 @@ impl Turns {
     ///
     /// "We" should be `self.to_move`.
     fn negamax(&mut self, depth: usize) -> Score {
+        // println!("depth is {depth}");
         if depth == 0 {
             return self.eval();
         }
@@ -137,7 +141,7 @@ impl Turns {
         for move_ in self.all_moves() {
             self.apply(&move_);
             best_score = Score::max(best_score, -self.negamax(depth - 1));
-            self.prev().expect("There will be a prev move.");
+            self.unapply();
         }
 
         best_score
@@ -153,7 +157,7 @@ impl Turns {
         for move_ in moves {
             self.apply(&move_);
             let score = -self.negamax(DEPTH);
-            self.prev().expect("There will be a prev move.");
+            self.unapply();
 
             if score >= best_score {
                 best_score = score;
@@ -164,34 +168,44 @@ impl Turns {
         self.apply(&best_move.expect("should've found a valid move."));
     }
 
-    /// Applies a move to the current board and saves the turn.
+    /// Reverses effects of [`apply`][`Turns::apply`].
+    fn unapply(&mut self) {
+        self.prev().expect("There will be a prev move.");
+        self.to_move = self.to_move.toggle();
+    }
+
+    /// Applies a move to the current board, saves the turn, and toggles the side to_move.
     ///
     /// Since we save, this will remove future turns that were saved!
+    /// Also, the entire turn is saved as one turn, not two, which would
+    /// happen if a user were to move.
     fn apply(&mut self, move_: &EngineMove) {
-        debug_assert!(
+        // println!("tomove is {:?}", self.to_move);
+        debug_assert_eq!(
             self.working_board
                 .get_mut(move_.travel.0)
                 .expect("EngineMove supplied wasn't valid")
-                .side()
-                == self.to_move
+                .side(),
+            self.to_move
         );
-        debug_assert!(
+        debug_assert_eq!(
             self.working_board
                 .get_mut(move_.rotate.0)
                 .expect("EngineMove supplied wasn't valid")
-                .side()
-                == self.to_move
+                .side(),
+            self.to_move
         );
 
         let (i, x, y) = move_.travel;
 
-        self.working_board.travel(i, x, y);
+        let i = self.working_board.travel(i, x, y);
         self.working_board
             .get_mut(i)
             .expect("EngineMove supplied wasn't valid")
-            .update_capmove_points_unchecked();
+            .init_auxiliary_data();
+        // .update_capmove_points_unchecked(); // wtf, error?
 
-        let (i, r) = move_.rotate;
+        let (_, r) = move_.rotate;
         self.working_board
             .get_mut(i)
             .expect("EngineMove supplied wasn't valid")
@@ -206,21 +220,28 @@ impl Turns {
     /// Current player defined by `self.to_move`.
     fn all_moves(&mut self) -> Vec<EngineMove> {
         let mut ans = vec![];
-        for (i, piece) in self.working_board.inner_mut().iter_mut().enumerate() {
+        for piece in self.working_board.inner_mut().iter_mut() {
+            piece.init_auxiliary_data();
+        }
+        for (i, piece) in self.working_board.inner_ref().iter().enumerate() {
             if piece.side() != self.to_move {
                 continue;
             }
-
-            piece.init_auxiliary_data();
-
-            for (x, y) in piece
+            for (tvk, x, y) in piece
                 .move_points_unchecked()
-                .chain(piece.capture_points_unchecked())
+                .map(|&(x, y)| (TravelKind::Move, x, y))
+                .chain(
+                    piece
+                        .capture_points_unchecked()
+                        .map(|&(x, y)| (TravelKind::Capture, x, y)),
+                )
             {
-                ans.push(EngineMove {
-                    travel: (i, *x, *y),
-                    rotate: (i, piece.angle()),
-                })
+                if self.working_board_ref().travelable(piece, x, y, tvk) {
+                    ans.push(EngineMove {
+                        travel: (i, x, y),
+                        rotate: (i, piece.angle()),
+                    });
+                }
             }
         }
         ans

@@ -355,7 +355,8 @@ impl RotchessEmulator {
                         self.selected_piece = None;
                         self.selected_travelpoint = None;
                         self.turns.save_turn();
-                        self.turns.set_to_move(self.pieces()[piece_idx].side());
+                        self.turns
+                            .set_to_move(self.pieces()[new_piece_idx].side().toggle());
                         return Some(ThingHappened::Move(piece_idx, tp_x, tp_y));
                     }
                     self.selected_travelpoint = None;
@@ -371,6 +372,8 @@ impl RotchessEmulator {
 
                     self.turns.set_to_move(self.pieces()[piece_idx].side());
                     let r = self.pieces()[piece_idx].angle();
+                    self.turns
+                        .set_to_move(self.pieces()[piece_idx].side().toggle());
                     return Some(ThingHappened::Rotate(piece_idx, r));
                 }
 
@@ -416,6 +419,8 @@ impl RotchessEmulator {
                     .expect("Invariant of unchecked")
                     .set_angle(r);
                 self.turns.save_turn();
+                self.turns
+                    .set_to_move(self.pieces()[piece_idx].side().toggle());
                 None
             }
             Event::MoveUnchecked(piece_idx, x, y) => {
@@ -434,6 +439,8 @@ impl RotchessEmulator {
                 self.update_travelpoints_unchecked();
                 self.selected_piece = None;
                 self.turns.save_turn();
+                self.turns
+                    .set_to_move(self.pieces()[piece_idx].side().toggle());
                 None
             }
             _ => None,
