@@ -180,6 +180,11 @@ impl RotchessEmulator {
             });
         }
     }
+
+    pub fn make_best_move(&mut self) {
+        self.turns.make_best_move();
+    }
+
     /// Handle an event.
     ///
     /// Priority order (high to low) for clicks:
