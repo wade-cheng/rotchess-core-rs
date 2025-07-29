@@ -147,8 +147,12 @@ impl Turns {
 
     /// Return the score we get in `depth` plies when minimizing our maximum loss.
     ///
-    /// "We" should be `self.to_move`.
-    fn negamax(&mut self, depth: usize) -> Score {
+    /// - "We" should be `self.to_move`.
+    /// - alpha is the highest score we already found. (if we see a score lower than it,
+    ///   no need to consider it.)
+    /// - beta is the best score we are able to get before the opponent is able to deny it
+    ///   with a reply we already found.
+    fn negamax_ab(&mut self, depth: usize, mut alpha: Score, beta: Score) -> Score {
         // println!("depth is {depth}");
         if depth == 0 {
             return self.eval();
@@ -158,8 +162,18 @@ impl Turns {
 
         for move_ in self.all_moves() {
             self.apply(&move_);
-            best_score = Score::max(best_score, -self.negamax(depth - 1));
+            let score = -self.negamax_ab(depth - 1, -beta, -alpha);
             self.unapply();
+
+            if score > best_score {
+                best_score = score;
+                if score > alpha {
+                    alpha = score;
+                }
+            }
+            if score >= beta {
+                break;
+            }
         }
 
         best_score
@@ -174,7 +188,7 @@ impl Turns {
         assert!(!moves.is_empty());
         for move_ in moves {
             self.apply(&move_);
-            let score = -self.negamax(DEPTH);
+            let score = -self.negamax_ab(DEPTH, Score::NEG_INFINITY, Score::INFINITY);
             self.unapply();
 
             if score >= best_score {
