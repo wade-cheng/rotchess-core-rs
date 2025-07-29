@@ -131,16 +131,11 @@ impl Turns {
             const CENTER_X: f32 = 4.0;
             /// Center of the board in rotchess units.
             const CENTER_Y: f32 = 4.0;
-            ans += 10.
-                - mult
-                    * match piece.side() {
-                        Side::Black => -1.,
-                        Side::White => 1.,
-                    }
-                    * Score::sqrt(
-                        (piece.x() - CENTER_X).powi(2)
-                            + (piece.forward_distance() - CENTER_Y).powi(2),
-                    );
+            ans -=
+                mult * match piece.side() {
+                    Side::Black => -1.,
+                    Side::White => 1.,
+                } * Score::sqrt((piece.x() - CENTER_X).powi(2) + (piece.y() - CENTER_Y).powi(2));
         }
         ans
     }
