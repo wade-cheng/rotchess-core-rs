@@ -193,10 +193,14 @@ impl Turns {
             }
         }
 
-        println!("best move had score {best_score}");
-        println!("current board state has score {}", self.eval());
-
         self.apply(&best_move.expect("should've found a valid move."));
+
+        println!("best move had score {best_score}");
+        println!(
+            "current board state has score {} according to {:?}",
+            self.eval(),
+            self.to_move
+        );
     }
 
     /// Reverses effects of [`apply`][`Turns::apply`].
