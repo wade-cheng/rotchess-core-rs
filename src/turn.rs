@@ -118,11 +118,29 @@ impl Turns {
         };
         let mut ans = 0.0;
         for piece in self.working_board.inner_ref() {
+            // add score value of each piece
             ans +=
                 mult * match piece.side() {
                     Side::Black => -1.,
                     Side::White => 1.,
-                } * piece.kind().value();
+                } * piece.kind().value()
+                    * 100.;
+
+            // make pieces go toward center.
+            /// Center of the board in rotchess units.
+            const CENTER_X: f32 = 4.0;
+            /// Center of the board in rotchess units.
+            const CENTER_Y: f32 = 4.0;
+            ans += 10.
+                - mult
+                    * match piece.side() {
+                        Side::Black => -1.,
+                        Side::White => 1.,
+                    }
+                    * Score::sqrt(
+                        (piece.x() - CENTER_X).powi(2)
+                            + (piece.forward_distance() - CENTER_Y).powi(2),
+                    );
         }
         ans
     }

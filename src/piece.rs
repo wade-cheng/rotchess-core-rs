@@ -489,6 +489,14 @@ impl Piece {
 
 /// Nontrivial piece stuff.
 impl Piece {
+    /// The distance from a side's send in rotchess units.
+    pub fn forward_distance(&self) -> f32 {
+        match self.side() {
+            Side::Black => self.y(),
+            Side::White => 8.0 - self.y(),
+        }
+    }
+
     pub fn collidepoint_generic(x1: f32, y1: f32, x2: f32, y2: f32) -> bool {
         (x1 - x2).powi(2) + (y1 - y2).powi(2) < PIECE_RADIUS.powi(2)
     }
