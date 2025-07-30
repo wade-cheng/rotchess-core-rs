@@ -180,6 +180,15 @@ impl Turns {
         let mut best_score: Score = Score::NEG_INFINITY;
         let mut best_move: Option<EngineMove> = None;
 
+        for piece in self
+            .working_board
+            .inner_mut()
+            .iter_mut()
+            .chain(self.turns[self.curr_turn].inner_mut())
+        {
+            piece.init_auxiliary_data();
+        }
+
         let moves = self.all_moves();
         assert!(!moves.is_empty());
         for move_ in moves {
@@ -237,8 +246,8 @@ impl Turns {
         self.working_board
             .get_mut(i)
             .expect("EngineMove supplied wasn't valid")
-            .init_auxiliary_data();
-        // .update_capmove_points_unchecked(); // wtf, error?
+            // .init_auxiliary_data();
+            .update_capmove_points_unchecked();
 
         let (_, r) = move_.rotate;
         self.working_board
