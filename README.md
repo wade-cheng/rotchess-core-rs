@@ -16,8 +16,8 @@ as the frontend.
 
 ### b3119b6a6ad47a75f038033681d355dda832b202
 
-This is the baseline commit. [`flamegraph`](doc_assets\flamegraph_init_auxiliary_data_b3119b6a6ad47a75f038033681d355dda832b202.svg)
+This is the baseline commit. [`flamegraph`](doc_assets/flamegraph_init_auxiliary_data_b3119b6a6ad47a75f038033681d355dda832b202.svg)
 
 ### cff26bed34f95e6833fe8cc68c87b2068d49c1ec
 
-I started using `update_capmove_points_unchecked` instead of initializing the whole piece whenever possible. This made things slower. [`flamegraph`](doc_assets\flamegraph_update_capmove_cff26bed34f95e6833fe8cc68c87b2068d49c1ec.svg)
+I started using `update_capmove_points_unchecked` instead of initializing the whole piece whenever possible. This made things slower. [`flamegraph`](doc_assets/flamegraph_update_capmove_cff26bed34f95e6833fe8cc68c87b2068d49c1ec.svg)
